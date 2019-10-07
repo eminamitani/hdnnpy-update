@@ -1,5 +1,6 @@
 from ase import Atoms
 from ase.calculators.calculator import FileIOCalculator, ReadError, Parameters
+from ase.io import write, read
 import os
 
 class hdnnpy(FileIOCalculator):
@@ -32,7 +33,7 @@ class hdnnpy(FileIOCalculator):
         #generate structure:'disp.xyz'
         xyz = 'disp.xyz'
         atoms.info['tag'] = self.prefix + atoms.get_chemical_formula()
-        ase.io.write(xyz, atoms, format='xyz')
+        write(xyz, atoms, format='xyz')
 
 
 

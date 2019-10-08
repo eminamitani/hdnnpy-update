@@ -6,7 +6,12 @@ from aseInterface import *
 from ase.build import bulk
 
 hdnnpy=hdnnpy()
+hdnnpy.set_label('./Crystal')
 a1 = bulk('Si', 'diamond', a=3.6)
-hdnnpy.write_input(atoms=a1)
+a1.set_calculator(hdnnpy)
+e=a1.get_potential_energy()
+print(e)
+f=a1.get_forces()
+print(f)
 
 

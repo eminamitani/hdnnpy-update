@@ -18,6 +18,11 @@
 このバグの修正版は将来的にリリースされるらしい。  
 参考：https://github.com/pypa/pipenv/issues/3044
 
+注意３:
+Macの場合はmatplotlibのbackendのエラーが出る。仮想環境下のhogehoge/lib/python3.6/site-packages/matplotlib/mpl-data/matplotlibrc　中の
+backend: macosx --> backend:Agg
+などに変更すること。
+
 ## pipenv (recommended)
 
 簡単かつ確実なインストール方法。

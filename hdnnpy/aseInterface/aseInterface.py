@@ -46,7 +46,7 @@ class hdnnpy(FileIOCalculator):
         #there is output directory and trained nnp data (master_nnp.npz, postprocess/pca.npz, training_result.yaml is stored)
         #this script generate 'disp.xyz' & prediction_config.py in the present directory
 
-        s='c.PredictionApplication.verbose = True \n'
+        s='c.PredictionApplication.verbose = False \n'
         s+='c.PredictionConfig.data_file = \'disp.xyz\' \n'
         s += 'c.PredictionConfig.dump_format  = \'.npz\' \n'
         s += 'c.PredictionConfig.load_dir   = \'./output\' \n'
@@ -68,11 +68,13 @@ class hdnnpy(FileIOCalculator):
                 force_data = prdata[ik]
                 force.append(force_data)
             if(ik.find('energy')>0):
-                energy=prdata[ik][0][0]
+                #Need to cast to float for plot trajectory
+                energy=float(prdata[ik][0][0])
 
         self.results['forces'] = np.array(
             force).reshape((-1, 3))
         self.results['energy']=energy
+
 
     def get_forces(self, atoms):
 

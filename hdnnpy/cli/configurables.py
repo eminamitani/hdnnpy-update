@@ -84,6 +84,12 @@ class ModelConfig(Configurable):
         help='Hidden layers of a neural network constituting HDNNP. '
              'Set as List[Tuple(Int(# of nodes), Str(activation function))]. '
         ).tag(config=True)
+    # choose initializetion
+    initializer = Unicode(
+        trait=Unicode,
+        default_value='HeNormal',
+        help='chainer Initializer for weight, HeNormal or GlorotNormal'
+        ).tag(config=True)
 
 
 class TrainingConfig(Configurable):

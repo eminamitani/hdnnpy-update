@@ -232,12 +232,12 @@ class MasterNNP(chainer.ChainList):
 
 class SubNNP(chainer.Chain):
     """Feed-forward neural network representing one element or atom."""
-    def __init__(self, element, n_feature, hidden_layers, n_property):
+    def __init__(self, element, n_feature, hidden_layers, n_property, initializer):
         """
         | ``element`` is registered as a persistent value.
         | It consists of repetition of fully connected layer and
           activation function.
-        | Weight initializer is :obj:`chainer.initializers.HeNormal`.
+        | Weight initializer is :obj:`chainer.initializers.HeNormal` or `chainer.initializers.GlorotNormal`.
 
         Args:
             element (str): Element symbol represented by an instance.
@@ -256,10 +256,15 @@ class SubNNP(chainer.Chain):
         super().__init__()
         self.add_persistent('element', element)
         self._n_layer = len(hidden_layers) + 1
+        self.initializer = initializer
         nodes = [n_feature, *[layer[0] for layer in hidden_layers], n_property]
         activations = [*[layer[1] for layer in hidden_layers], 'identity']
         with self.init_scope():
-            w = chainer.initializers.HeNormal()
+            if(self.initializer=='HeNormal'):
+                w = chainer.initializers.HeNormal()
+            elif(self.initializer=='GlorotNormal'):
+                w = chainer.initializers.GlorotNormal()
+
             for i, (in_size, out_size, activation) in enumerate(zip(
                     nodes[:-1], nodes[1:], activations)):
                 setattr(self, f'activation_function{i}',

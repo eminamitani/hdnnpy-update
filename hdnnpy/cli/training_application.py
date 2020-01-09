@@ -185,7 +185,7 @@ class TrainingApplication(Application):
 
         # model and optimizer
         master_nnp = MasterNNP(
-            tc.elements, mc.n_input, mc.hidden_layers, mc.n_output)
+            tc.elements, mc.n_input, mc.hidden_layers, mc.n_output, mc.initializer)
         master_opt = chainer.optimizers.Adam(tc.init_lr)
         master_opt = chainermn.create_multi_node_optimizer(master_opt, comm)
         master_opt.setup(master_nnp)
@@ -205,7 +205,7 @@ class TrainingApplication(Application):
             # model
             hdnnp = HighDimensionalNNP(
                 training.elemental_composition,
-                mc.n_input, mc.hidden_layers, mc.n_output)
+                mc.n_input, mc.hidden_layers, mc.n_output, mc.initializer)
             hdnnp.sync_param_with(master_nnp)
             main_opt = chainer.Optimizer()
             main_opt = chainermn.create_multi_node_optimizer(main_opt, comm)

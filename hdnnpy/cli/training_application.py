@@ -141,7 +141,8 @@ class TrainingApplication(Application):
 
         train_dataset=self.construct_training_datasets(tag_training_xyz_map)
         test_dataset = self.construct_test_datasets(tag_test_xyz_map)
-        dataset=[train_dataset,test_dataset]
+        dataset=[]
+        dataset.append((train_dataset,test_dataset))
 
         result = self.train(dataset)
         if MPI.rank == 0:
@@ -296,18 +297,18 @@ class TrainingApplication(Application):
         for pattern in tc.tags:
             for tag in fnmatch.filter(tag_xyz_map, pattern):
                 if self.verbose:
-                    pprint(f'Construct sub dataset tagged as "{tag}"')
+                    pprint(f'Construct train dataset tagged as "{tag}"')
                 tagged_xyz = tag_xyz_map.pop(tag)
                 structures = AtomicStructure.read_xyz(tagged_xyz)
 
                 # prepare descriptor dataset
                 descriptor = DESCRIPTOR_DATASET[dc.descriptor](
-                    tc.order, structures, **dc.parameters)
+                    self.loss_function.order['descriptor'], structures, **dc.parameters)
                 descriptor.make(verbose=self.verbose)
 
                 # prepare empty property dataset
                 property_ = PROPERTY_DATASET[dc.property_](
-                    tc.order, structures)
+                    self.loss_function.order['descriptor'], structures)
 
                 # construct test dataset from descriptor & property datasets
                 dataset = HDNNPDataset(descriptor, property_)

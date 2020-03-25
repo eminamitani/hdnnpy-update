@@ -129,6 +129,7 @@ class TrainingApplication(Application):
 
                 ase.io.write(str(tc.data_file.with_name(tag))+"/train.xyz",train,format='xyz')
                 ase.io.write(str(tc.data_file.with_name(tag)) + "/test.xyz", test, format='xyz')
+                print(tc.data_file.__class__)
 
                 tag_training_xyz_map[tag] = (tc.data_file.with_name(tag)
                                     / 'train.xyz')

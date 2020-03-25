@@ -26,6 +26,8 @@ from hdnnpy.training import (
     )
 from hdnnpy.training.loss_function import LOSS_FUNCTION
 from hdnnpy.utils import (MPI, pprint, pyyaml_path_representer)
+import ase.io
+
 
 
 class TrainingApplication(Application):
@@ -99,6 +101,7 @@ class TrainingApplication(Application):
         self.loss_function = LOSS_FUNCTION[name]
 
     def start(self):
+
         tc = self.training_config
         tc.out_dir.mkdir(parents=True, exist_ok=True)
         if not self.is_resume:
@@ -106,12 +109,44 @@ class TrainingApplication(Application):
                         tc.out_dir / self.config_file.name)
         tag_xyz_map, tc.elements = parse_xyz(
             tc.data_file, verbose=self.verbose)
-        datasets = self.construct_datasets(tag_xyz_map)
-        dataset = DatasetGenerator(*datasets).holdout(tc.train_test_ratio)
+        #hold out before PCA
+        print(tag_xyz_map)
+        tag_training_xyz_map={}
+        tag_test_xyz_map = {}
+        for pattern in tc.tags:
+            for tag in fnmatch.filter(tag_xyz_map, pattern):
+                if self.verbose:
+                    pprint(f'holdout xyz data tagged as "{tag}"')
+                tagged_xyz = tag_xyz_map.pop(tag)
+                print(tagged_xyz)
+                xyz_data=ase.io.read(str(tagged_xyz), index=':', format='xyz')
+                #print(xyz_data)
+                s = int(len(xyz_data) * tc.train_test_ratio)
+                train = xyz_data[:s]
+                test = xyz_data[s:]
+                assert len(train) > 0
+                assert len(test) > 0
+
+                ase.io.write(str(tc.data_file.with_name(tag))+"/train.xyz",train,format='xyz')
+                ase.io.write(str(tc.data_file.with_name(tag)) + "/test.xyz", test, format='xyz')
+
+                tag_training_xyz_map[tag] = (tc.data_file.with_name(tag)
+                                    / 'train.xyz')
+                tag_test_xyz_map[tag] = (tc.data_file.with_name(tag)
+                                    / 'test.xyz')
+
+        #datasets = self.construct_datasets(tag_xyz_map)
+        #dataset = DatasetGenerator(*datasets).holdout(tc.train_test_ratio)
+
+        train_dataset=self.construct_training_datasets(tag_training_xyz_map)
+        test_dataset = self.construct_training_datasets(tag_test_xyz_map)
+        dataset=[train_dataset,test_dataset]
+
         result = self.train(dataset)
         if MPI.rank == 0:
             self.dump_result(result)
 
+    #original one
     def construct_datasets(self, tag_xyz_map):
         dc = self.dataset_config
         mc = self.model_config
@@ -173,6 +208,115 @@ class TrainingApplication(Application):
             preprocess.save(
                 preprocess_dir / f'{preprocess.name}.npz',
                 verbose=self.verbose)
+
+        return datasets
+
+    #for preprocess, only use training dataset
+    def construct_training_datasets(self, tag_xyz_map):
+        dc = self.dataset_config
+        mc = self.model_config
+        tc = self.training_config
+
+        preprocess_dir = tc.out_dir / 'preprocess'
+        preprocess_dir.mkdir(parents=True, exist_ok=True)
+        preprocesses = []
+        for (name, args, kwargs) in dc.preprocesses:
+            preprocess = PREPROCESS[name](*args, **kwargs)
+            if self.is_resume:
+                preprocess.load(
+                    preprocess_dir / f'{name}.npz', verbose=self.verbose)
+            preprocesses.append(preprocess)
+
+        datasets = []
+        for pattern in tc.tags:
+            for tag in fnmatch.filter(tag_xyz_map, pattern):
+                if self.verbose:
+                    pprint(f'Construct sub dataset tagged as "{tag}"')
+                tagged_xyz = tag_xyz_map.pop(tag)
+                structures = AtomicStructure.read_xyz(tagged_xyz)
+
+                # prepare descriptor dataset
+                descriptor = DESCRIPTOR_DATASET[dc.descriptor](
+                    self.loss_function.order['descriptor'],
+                    structures, **dc.parameters)
+                descriptor_npz = tagged_xyz.with_name(f'{dc.descriptor}.npz')
+                if descriptor_npz.exists():
+                    descriptor.load(
+                        descriptor_npz, verbose=self.verbose, remake=dc.remake)
+                else:
+                    descriptor.make(verbose=self.verbose)
+                    descriptor.save(descriptor_npz, verbose=self.verbose)
+
+                # prepare property dataset
+                property_ = PROPERTY_DATASET[dc.property_](
+                    self.loss_function.order['property'], structures)
+                property_npz = tagged_xyz.with_name(f'{dc.property_}.npz')
+                if property_npz.exists():
+                    property_.load(
+                        property_npz, verbose=self.verbose, remake=dc.remake)
+                else:
+                    property_.make(verbose=self.verbose)
+                    property_.save(property_npz, verbose=self.verbose)
+
+                # construct HDNNP dataset from descriptor & property datasets
+                dataset = HDNNPDataset(descriptor, property_)
+                dataset.construct(
+                    all_elements=tc.elements, preprocesses=preprocesses,
+                    shuffle=True, verbose=self.verbose)
+                dataset.scatter()
+                datasets.append(dataset)
+                dc.n_sample += dataset.total_size
+                mc.n_input = dataset.n_input
+                mc.n_output = dataset.n_label
+
+        for preprocess in preprocesses:
+            preprocess.save(
+                preprocess_dir / f'{preprocess.name}.npz',
+                verbose=self.verbose)
+
+        return datasets
+
+    #use preprocess defined by training dataset
+    #same procedure as prediction case
+    def construct_test_datasets(self, tag_xyz_map):
+        dc = self.dataset_config
+        mc = self.model_config
+        tc = self.training_config
+
+        preprocesses = []
+        for (name, args, kwargs) in dc.preprocesses:
+            preprocess = PREPROCESS[name](*args, **kwargs)
+            preprocess.load(
+                tc.load_dir / 'preprocess' / f'{name}.npz',
+                verbose=self.verbose)
+            preprocesses.append(preprocess)
+
+        datasets = []
+        for pattern in tc.tags:
+            for tag in fnmatch.filter(tag_xyz_map, pattern):
+                if self.verbose:
+                    pprint(f'Construct sub dataset tagged as "{tag}"')
+                tagged_xyz = tag_xyz_map.pop(tag)
+                structures = AtomicStructure.read_xyz(tagged_xyz)
+
+                # prepare descriptor dataset
+                descriptor = DESCRIPTOR_DATASET[dc.descriptor](
+                    tc.order, structures, **dc.parameters)
+                descriptor.make(verbose=self.verbose)
+
+                # prepare empty property dataset
+                property_ = PROPERTY_DATASET[dc.property_](
+                    tc.order, structures)
+
+                # construct test dataset from descriptor & property datasets
+                dataset = HDNNPDataset(descriptor, property_)
+                dataset.construct(
+                    all_elements=tc.elements, preprocesses=preprocesses,
+                    shuffle=False, verbose=self.verbose)
+                datasets.append(dataset)
+                dc.n_sample += dataset.total_size
+                mc.n_input = dataset.n_input
+                mc.n_output = dataset.n_label
 
         return datasets
 

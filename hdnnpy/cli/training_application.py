@@ -282,12 +282,12 @@ class TrainingApplication(Application):
         dc = self.dataset_config
         mc = self.model_config
         tc = self.training_config
-
+        preprocess_dir = tc.out_dir / 'preprocess'
         preprocesses = []
         for (name, args, kwargs) in dc.preprocesses:
             preprocess = PREPROCESS[name](*args, **kwargs)
             preprocess.load(
-                tc.load_dir / 'preprocess' / f'{name}.npz',
+                preprocess_dir / f'{preprocess.name}.npz',
                 verbose=self.verbose)
             preprocesses.append(preprocess)
 

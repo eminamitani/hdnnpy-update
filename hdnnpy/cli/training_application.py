@@ -139,7 +139,7 @@ class TrainingApplication(Application):
         #dataset = DatasetGenerator(*datasets).holdout(tc.train_test_ratio)
 
         train_dataset=self.construct_training_datasets(tag_training_xyz_map)
-        test_dataset = self.construct_training_datasets(tag_test_xyz_map)
+        test_dataset = self.construct_test_datasets(tag_test_xyz_map)
         dataset=[train_dataset,test_dataset]
 
         result = self.train(dataset)

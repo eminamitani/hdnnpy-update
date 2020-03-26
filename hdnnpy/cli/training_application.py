@@ -27,6 +27,9 @@ from hdnnpy.training import (
 from hdnnpy.training.loss_function import LOSS_FUNCTION
 from hdnnpy.utils import (MPI, pprint, pyyaml_path_representer)
 import ase.io
+## Additional import for saving dataset and exit before train
+import numpy as np
+import sys
 
 
 
@@ -111,6 +114,7 @@ class TrainingApplication(Application):
             tc.data_file, verbose=self.verbose)
         #hold out before PCA
         print(tag_xyz_map)
+        '''
         tag_training_xyz_map={}
         tag_test_xyz_map = {}
         for pattern in tc.tags:
@@ -135,14 +139,25 @@ class TrainingApplication(Application):
                                     / 'train.xyz')
                 tag_test_xyz_map[tag] = (tc.data_file.with_name(tag)
                                     / 'test.xyz')
+        '''
 
-        #datasets = self.construct_datasets(tag_xyz_map)
-        #dataset = DatasetGenerator(*datasets).holdout(tc.train_test_ratio)
+        #original detaset generation
+        #In this case, PCA use all data to constract transform matrix
+        datasets = self.construct_datasets(tag_xyz_map)
+        dataset = DatasetGenerator(*datasets).holdout(tc.train_test_ratio)
+        print(dataset)
 
-        train_dataset=self.construct_training_datasets(tag_training_xyz_map)
-        test_dataset = self.construct_test_datasets(tag_test_xyz_map)
-        dataset=[]
-        dataset.append((train_dataset,test_dataset))
+        #train_dataset=self.construct_training_datasets(tag_training_xyz_map)
+        #test_dataset = self.construct_test_datasets(tag_test_xyz_map)
+        #dataset=[]
+        #dataset.append((train_dataset,test_dataset))
+
+        ## Stop process here if no_train flag is set
+        print(tc.no_train)
+        if tc.no_train:
+            print('Process is stopped by no_train flag')
+            sys.exit()
+        ## End of stopping process
 
         result = self.train(dataset)
         if MPI.rank == 0:

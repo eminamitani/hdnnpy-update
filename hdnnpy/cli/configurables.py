@@ -176,6 +176,11 @@ class TrainingConfig(Configurable):
         False,
         help='Set chainer training extension `PlotReport` if this flag is set'
         ).tag(config=True)
+    # additional flag to stop training
+    no_train = Bool(
+        False,
+        help='Stop process before starting train if this flag is set'
+        ).tag(config=True)
 
 
 class PredictionConfig(Configurable):

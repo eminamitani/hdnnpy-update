@@ -30,6 +30,7 @@ import ase.io
 ## Additional import for saving dataset and exit before train
 import numpy as np
 import sys
+import random
 
 
 
@@ -112,16 +113,26 @@ class TrainingApplication(Application):
                         tc.out_dir / self.config_file.name)
         tag_xyz_map, tc.elements = parse_xyz(
             tc.data_file, verbose=self.verbose)
-        #hold out before PCA
-        print(tag_xyz_map)
-        '''
-        tag_training_xyz_map={}
+
+        #2020/3/26 making hold out before PCA
+        #split xyz data to train and test
+        #then, construct dataset
+        #the procedure is as follows:
+        #1. temporaly save to train.xyz and test.xyz for each tag and
+        #   map the tag to each file
+        #2. construct the symmetry function data and PCA fit for training data
+        #3. construct the symmetry function and apply PCA preprocess obtained by step 2
+
+        #print(tag_xyz_map)
+
+
+        tag_training_xyz_map = {}
         tag_test_xyz_map = {}
         for pattern in tc.tags:
             for tag in fnmatch.filter(tag_xyz_map, pattern):
                 if self.verbose:
                     pprint(f'holdout xyz data tagged as "{tag}"')
-                tagged_xyz = tag_xyz_map.pop(tag)
+                tagged_xyz = tag_xyz_map.get(tag)
                 print(tagged_xyz)
                 xyz_data=ase.io.read(str(tagged_xyz), index=':', format='xyz')
                 #print(xyz_data)
@@ -139,25 +150,55 @@ class TrainingApplication(Application):
                                     / 'train.xyz')
                 tag_test_xyz_map[tag] = (tc.data_file.with_name(tag)
                                     / 'test.xyz')
+
+        train_datasets = self.construct_training_datasets(tag_training_xyz_map)
+        test_datasets = self.construct_test_datasets(tag_test_xyz_map)
+        print(train_datasets)
+        print(test_datasets)
         '''
+        for t in train_datasets:
+            print(t.tag)
+            print(t.property.properties)
+        '''
+
+        #reshapse the form of dataset
+        dataset=[]
+        for train in train_datasets:
+            tag=train.tag
+            test_dataset = None
+            for test in test_datasets:
+                if(test.tag ==tag):
+                    test_dataset=test
+            print(test_dataset)
+            dataset.append((train,test))
+
+        #test
+        for training, test in dataset:
+            print(training.tag)
+            print(test.tag)
+            print(training.property.properties)
+            print(test.property.properties)
+
 
         #original detaset generation
         #In this case, PCA use all data to constract transform matrix
+        '''
+        print(tag_xyz_map)
         datasets = self.construct_datasets(tag_xyz_map)
+        print(datasets)
         dataset = DatasetGenerator(*datasets).holdout(tc.train_test_ratio)
         print(dataset)
+        '''
 
-        #train_dataset=self.construct_training_datasets(tag_training_xyz_map)
-        #test_dataset = self.construct_test_datasets(tag_test_xyz_map)
-        #dataset=[]
-        #dataset.append((train_dataset,test_dataset))
 
         ## Stop process here if no_train flag is set
-        print(tc.no_train)
+        #print(tc.no_train)
         if tc.no_train:
             print('Process is stopped by no_train flag')
             sys.exit()
         ## End of stopping process
+
+
 
         result = self.train(dataset)
         if MPI.rank == 0:
@@ -312,7 +353,7 @@ class TrainingApplication(Application):
         for pattern in tc.tags:
             for tag in fnmatch.filter(tag_xyz_map, pattern):
                 if self.verbose:
-                    pprint(f'Construct train dataset tagged as "{tag}"')
+                    pprint(f'Construct test dataset tagged as "{tag}"')
                 tagged_xyz = tag_xyz_map.pop(tag)
                 structures = AtomicStructure.read_xyz(tagged_xyz)
 
@@ -321,15 +362,17 @@ class TrainingApplication(Application):
                     self.loss_function.order['descriptor'], structures, **dc.parameters)
                 descriptor.make(verbose=self.verbose)
 
-                # prepare empty property dataset
+                # prepare property dataset
                 property_ = PROPERTY_DATASET[dc.property_](
-                    self.loss_function.order['descriptor'], structures)
+                    self.loss_function.order['property'], structures)
+                property_.make(verbose=self.verbose)
 
                 # construct test dataset from descriptor & property datasets
                 dataset = HDNNPDataset(descriptor, property_)
                 dataset.construct(
                     all_elements=tc.elements, preprocesses=preprocesses,
                     shuffle=False, verbose=self.verbose)
+                dataset.scatter()
                 datasets.append(dataset)
                 dc.n_sample += dataset.total_size
                 mc.n_input = dataset.n_input

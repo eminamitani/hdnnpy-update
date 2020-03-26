@@ -69,7 +69,6 @@ class ScatterPlot(Extension):
         self._coefficients = dataset.property.coefficients
         self._units = dataset.property.units
         batch = chainer.dataset.concat_examples(dataset)
-        print(batch)
         self._inputs = [batch[f'inputs/{i}'] for i in range(self._order + 1)]
         labels = [batch[f'labels/{i}'] for i in range(self._order + 1)]
         self._count = np.array(self._comm.gather(len(labels[0]), root=0))

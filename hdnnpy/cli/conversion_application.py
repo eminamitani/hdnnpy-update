@@ -46,7 +46,7 @@ class ConversionApplication(Application):
 
         yaml.add_constructor('Path', pyyaml_path_constructor)
         self.training_result = yaml.load(
-            (self.load_dir / 'training_result.yaml').open())
+            (self.load_dir / 'training_result.yaml').open(),Loader=yaml.FullLoader)
         self.dataset_config = DatasetConfig(**self.training_result['dataset'])
         self.model_config = ModelConfig(**self.training_result['model'])
 
@@ -66,7 +66,8 @@ class ConversionApplication(Application):
         master_nnp = MasterNNP(tr['training']['elements'],
                                tr['model']['n_input'],
                                mc.hidden_layers,
-                               tr['model']['n_output'])
+                               tr['model']['n_output'],
+                               mc.initializer)
         chainer.serializers.load_npz(
             self.load_dir / 'master_nnp.npz', master_nnp)
 

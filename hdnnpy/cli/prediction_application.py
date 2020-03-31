@@ -137,7 +137,7 @@ class PredictionApplication(Application):
 
         # master model
         master_nnp = MasterNNP(
-            pc.elements, mc.n_input, mc.hidden_layers, mc.n_output)
+            pc.elements, mc.n_input, mc.hidden_layers, mc.n_output, mc.initializer)
         chainer.serializers.load_npz(
             pc.load_dir / 'master_nnp.npz', master_nnp)
 
@@ -145,7 +145,7 @@ class PredictionApplication(Application):
             # hdnnp model
             hdnnp = HighDimensionalNNP(
                 dataset.elemental_composition,
-                mc.n_input, mc.hidden_layers, mc.n_output)
+                mc.n_input, mc.hidden_layers, mc.n_output, mc.initializer)
             hdnnp.sync_param_with(master_nnp)
 
             batch = chainer.dataset.concat_examples(dataset)
